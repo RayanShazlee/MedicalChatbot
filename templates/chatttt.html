@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Medical Chatbot</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/latest/TweenMax.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='stylee.css') }}" />
+</head>
+<body>
+<div class="container-fluid">
+  <div class="row">
+    <!-- Left Sidebar: Chat History -->
+    <div class="col-3 border-end" style="max-height: 100vh; overflow-y: auto;">
+      <h4 class="mt-3 text-center">Chat History</h4>
+      <ul id="chat-history" class="list-group mt-3 mb-5">
+        {% if chat_history and chat_history|selectable("role", "equalto", "user")|list %}
+          {% for msg in chat_history if msg.role == 'user' %}
+            <li class="list-group-item"><strong>Q:</strong> {{ msg.message }}</li>
+          {% endfor %}
+        {% else %}
+          <li class="list-group-item text-muted" id="no-questions-msg">No questions yet.</li>
+        {% endif %}
+      </ul>
+    </div>
+
+    <!-- Main Chat Area -->
+    <div class="chat-container1 col-9">
+      <div class="chat-container">
+        <div class="chat-header">
+          <img src="https://img.freepik.com/premium-vector/chatbot-icon-concept-chat-bot-chatterbot-robot-virtual-assistance-website_123447-1615.jpg"
+               width="40" class="rounded-circle me-2" alt="Bot Avatar">
+          <h5 class="mb-0">Medical Chatbot</h5>
+        </div>
+
+        <div id="chat-body" class="chat-body"></div>
+
+        <form id="chat-input" class="chat-input">
+          <input id="text" type="text" class="form-control" placeholder="Ask me anything..." required>
+          <button type="submit" class="btn btn-primary rounded-circle">
+            <i class="fa-solid fa-paper-plane"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+$(document).ready(function() {
+  $("#chat-input").submit(function(event) {
+    event.preventDefault();
+
+    const userText = $("#text").val().trim();
+    if (!userText) return;
+
+    // Disable input while processing
+    $("#text").prop("disabled", true);
+    $("button[type=submit]").prop("disabled", true);
+
+    // Remove "No questions yet" if it exists
+    $("#no-questions-msg").remove();
+
+    // Append user message
+    $("#chat-body").append(`
+      <div class="msg-bubble user-msg fade-in">
+        ${userText}
+      </div>
+    `);
+
+    // Update chat history
+    $("#chat-history").append(`
+      <li class="list-group-item fade-in">
+        <strong>Q:</strong> ${userText}
+      </li>
+    `);
+
+    // Clear input and scroll
+    $("#text").val("");
+    scrollToBottom();
+
+    // Send request to backend
+    $.ajax({
+      type: "POST",
+      url: "/get",
+      data: { msg: userText },
+      contentType: "application/x-www-form-urlencoded",
+      dataType: "json"
+    })
+    .done(function(response) {
+      let botAnswer;
+      if (response.error) {
+        botAnswer = response.error;
+      } else if (response.response) {
+        botAnswer = response.response;
+      } else {
+        botAnswer = "Sorry, something went wrong!";
+      }
+
+      // Create bot message container
+      const botHtml = $('<div class="msg-bubble bot-msg fade-in"></div>');
+      $("#chat-body").append(botHtml);
+
+      // Animate response
+      animateTypingEffect(botHtml, botAnswer);
+
+      // Re-enable input
+      $("#text").prop("disabled", false);
+      $("button[type=submit]").prop("disabled", false);
+      $("#text").focus();
+
+      scrollToBottom();
+    })
+    .fail(function(jqXHR) {
+      const errorMessage = (jqXHR.responseJSON && jqXHR.responseJSON.error) 
+        ? jqXHR.responseJSON.error 
+        : "Error: Unable to fetch response. Please try again.";
+
+      $("#chat-body").append(`
+        <div class="msg-bubble bot-msg error-msg fade-in">
+          ${errorMessage}
+        </div>
+      `);
+
+      // Re-enable input
+      $("#text").prop("disabled", false);
+      $("button[type=submit]").prop("disabled", false);
+      $("#text").focus();
+
+      scrollToBottom();
+    });
+  });
+
+  function scrollToBottom() {
+    const chatBody = $("#chat-body");
+    chatBody.animate({ scrollTop: chatBody[0].scrollHeight }, 200);
+  }
+
+  function animateTypingEffect(element, text) {
+    // Split text into sentences for better formatting
+    const sentences = text.split(/([.!?]+)\s+/);
+    let html = '';
+    
+    sentences.forEach((part, index) => {
+      if (part.trim()) {
+        html += `<span class="sentence">${part}</span>`;
+        if (index < sentences.length - 1) {
+          html += ' ';
+        }
+      }
+    });
+    
+    element.html(html);
+
+    // Animate each sentence
+    element.find('.sentence').each(function(index) {
+      const sentence = $(this);
+      TweenMax.to(sentence, 0.1, {
+        autoAlpha: 1,
+        ease: Power1.easeIn,
+        delay: index * 0.2
+      });
+    });
+  }
+});
+</script>
+
+</body>
+</html>

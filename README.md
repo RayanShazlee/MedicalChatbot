@@ -1,4 +1,4 @@
-# MedicalChatbot-Llama2
+# MedicalChatbot
 
 ## Installation Steps
 
